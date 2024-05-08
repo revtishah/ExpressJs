@@ -13,6 +13,8 @@ const pool = mysql.createPool({
     waitForConnections: true,
     queueLimit: 0
 });
+console.log('Database Host:', process.env.DB_HOST);
+console.log('Database User:', process.env.DB_USER);
 
 const promisePool = pool.promise();
 const app = express();
