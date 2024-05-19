@@ -45,13 +45,21 @@ app.get('/get-messages', async (req, res) => {
     const countQuery = 'SELECT COUNT(*) AS total FROM information';
 
     try {
+        debugger;
         const [results] = await promisePool.query(sql, [offset, pageSize]);
-        const [[total]] = await promisePool.query(countQuery);
+        const [countResult] = await promisePool.query(countQuery);
+
+        if (!countResult.length) {
+            throw new Error('Count query returned no results');
+        }
+
+        const total = countResult[0].total;
+
         res.json({
             data: results,
             currentPage: page,
             pageSize: pageSize,
-            totalCount: total[0].total
+            totalCount: total
         });
     } catch (error) {
         console.error('Database error:', error);
