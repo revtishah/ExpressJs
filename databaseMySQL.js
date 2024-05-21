@@ -35,6 +35,61 @@ app.post('/add-message', async (req, res) => {
         res.status(500).send('Error adding data to the database');
     }
 });
+//GET all data from mySQL
+const countQuery = 'SELECT COUNT(*) AS total FROM information';
+// Simple in-memory cache
+let cache = {};
+let cacheTimeout = 5 * 60 * 1000; // 5 minutes
+
+//GET all search data from mySQL
+app.get('/global-search', async (req, res) => {
+    const searchTerm = req.query.searchTerm || '';
+    //Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 10;
+    const offset = (page - 1) * pageSize;
+
+    const cacheKey = `global-search-${searchTerm}-${page}-${pageSize}`;
+    // debugger;
+    // Check cache first
+    if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp) < cacheTimeout) {
+        console.log('Returning cached data');
+        return res.json(cache[cacheKey].data);
+    }
+
+    // Assuming a simple search across 'name' and 'message' fields in the 'information' table
+    // Always use parameterized queries to prevent SQL injection
+    const sql = 'SELECT name, message FROM information WHERE name LIKE ? LIMIT ? OFFSET ?';
+    const countSql = 'SELECT COUNT(*) AS total FROM information WHERE name LIKE ?';
+    const likeTerm = `%${searchTerm}%`;
+
+    console.log("Search Name/Term", likeTerm);
+    try {
+        const [results] = await promisePool.query(sql, [likeTerm,  pageSize, offset]);
+        const [[{total}]] = await promisePool.query(countSql, [likeTerm]);
+
+        const totalPages = Math.ceil(total / pageSize);
+
+        const response = {
+            data: results,
+            currentPage: page,
+            pageSize: pageSize,
+            totalCount: total,
+            totalPages: totalPages
+        };
+
+        // Update cache
+        cache[cacheKey] = {
+            timestamp: Date.now(),
+            data: response
+        };
+
+        res.json(response);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: error.message });
+    }
+});
 
 // GET route to retrieve all messages with pagination
 app.get('/get-messages', async (req, res) => {
